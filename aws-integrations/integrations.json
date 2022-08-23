@@ -1,0 +1,19 @@
+{
+    "paths": {
+      "/WeatherForecast": {
+        "get": {
+          "x-amazon-apigateway-auth": {
+            "type": "none"
+          },
+          "x-amazon-apigateway-integration": {
+            "x-amazon-apigateway-integration": null,
+            "type": "aws_proxy",
+            "uri": "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:{AWS_ACCOUNT}:function:LambdaWeather/invocations",
+            "httpMethod": "POST",
+            "passthroughBehavior": "when_no_templates",
+            "payloadFormatVersion": 1
+          }
+        }
+      }
+    }
+}

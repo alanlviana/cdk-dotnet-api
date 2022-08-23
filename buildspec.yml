@@ -1,0 +1,36 @@
+version: 0.2
+env:
+  variables:
+    BucketOpenAPI: "value"
+    ProjectName: "api"
+phases:
+  install:
+    runtime-versions:
+      dotnet: 6.0
+  pre_build:
+    commands:
+      - echo Build Number ${CODEBUILD_BUILD_NUMBER} 
+      - echo Install Swagger CLI
+      - dotnet new tool-manifest
+      - dotnet tool install --version 6.2.3 Swashbuckle.AspNetCore.Cli
+      - echo Project restore started on `date`
+      - dotnet restore api/${ProjectName}.csproj
+  build:
+    commands:
+      - echo Build started on `date`
+      - dotnet build api/${ProjectName}.csproj
+      - dotnet swagger tofile --output api/bin/Debug/net6.0/swagger-$CODEBUILD_BUILD_NUMBER.json api/bin/Debug/net6.0/api.dll v1
+      - sed -i "s/{AWS_ACCOUNT}/$AWS_ACCOUNT_ID/g" aws-integrations/integrations.json
+      - jq -s '.[0] as $a | .[1] as $b | $a * $b' api/bin/Debug/net6.0/swagger-$CODEBUILD_BUILD_NUMBER.json aws-integrations/integrations.json > swagger-with-integration.json
+      - aws s3 cp swagger-with-integration.json s3://$BucketOpenAPI/swagger-$CODEBUILD_BUILD_NUMBER.json
+      - aws ssm put-parameter --name "BucketOpenAPI" --type "String" --value $BucketOpenAPI --overwrite
+      - aws ssm put-parameter --name "ObjectOpenAPI" --type "String" --value swagger-$CODEBUILD_BUILD_NUMBER.json --overwrite
+  post_build:
+    commands:
+      - echo Publish started on `date`
+      - dotnet publish -c Release -r linux-x64 -o ./publish api/${ProjectName}.csproj
+artifacts:
+  files:
+    - '**/*'
+  base-directory: './api/bin/Release/net6.0/linux-x64*'
+  discard-paths: yes

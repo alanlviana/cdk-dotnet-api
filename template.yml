@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Lambda API
+Parameters:
+  ApiName:
+    Type: String
+    Description: API Name
+  BucketName:
+    Type: String
+    Description: Bucket name of Build Artifact.
+  ObjectKey:
+    Type: String
+    Description: Bucket name of Build Artifact.
+  BucketOpenAPI:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /BucketOpenAPI
+  ObjectOpenAPI:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /ObjectOpenAPI
+Resources:
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties: 
+      Name: !Join [ "", [ !Ref ApiName, "RestApi"] ]
+      BodyS3Location: 
+        Bucket: !Ref BucketOpenAPI
+        Key: !Ref ObjectOpenAPI
+      Description: A Rest API
+    DependsOn: LambdaRestAPI
+
+  LambdaRestAPIPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaRestAPI
+      Action: "lambda:InvokeFunction"
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:*
+    DependsOn: LambdaRestAPI
+
+  LambdaRestAPI:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Join [ "", [ "Lambda",!Ref ApiName] ]
+      Runtime: dotnet6
+      MemorySize: 4096
+      Timeout: 30
+      Role: !GetAtt LambdaRestApiExecutionRole.Arn
+      Handler: api
+      Code:
+        S3Bucket: !Ref BucketName
+        S3Key: !Ref ObjectKey
+      Description: Rest API Lambda Function
+      TracingConfig:
+        Mode: Active
+    DependsOn: LambdaRestApiExecutionRole
+
+  LambdaRestApiExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: ExecutionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource:
+                  - '*'
